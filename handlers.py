@@ -48,6 +48,10 @@ def choose_input_method(message):
 def handle_printer_selection(message):
     selected_printer_model = message.text
     bot.send_message(message.chat.id, f"Выбран принтер: {selected_printer_model}")
+    # Добавим вызов функции, которая находит принтер
+    find_printer(message)
+
+
 
 def find_printer(message):
     printer_name = message.text
