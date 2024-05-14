@@ -72,21 +72,23 @@ def send_main_menu(chat_id, user_first_name):
     markup.add(*[types.KeyboardButton(btn) for btn in buttons])
     bot.send_message(chat_id, f"Привет, {user_first_name}! Чем я могу вам помочь?", reply_markup=markup)
 
-@bot.message_handler(func=lambda message: True)
+@bot.message_handler()
 def handle_main_menu(message):
     current_menu_item = message.text
     chat_id = message.chat.id
     if current_menu_item == 'Скачать инструкцию':
         handle_printer_link(message)
     elif current_menu_item == 'Пользовательская инструкция':
-        send_instruction_menu(chat_id)
+        # Здесь вызываем функцию, которая отправляет меню с разделами пользовательской инструкции
+        send_sections_menu(chat_id)
     elif current_menu_item == 'Описание принтера':
         handle_printer_description(message)
     elif current_menu_item == 'Выбрать другой принтер':
         bot.send_message(chat_id, "Пожалуйста, введите название другого принтера:")
         bot.register_next_step_handler(message, find_printer)
     elif current_menu_item == 'Инструкция для администратора':
-        send_instruction_menu(chat_id)
+        send_sections_menu1(chat_id)
+
 
 def handle_printer_link(message):
     chat_id = message.chat.id
@@ -133,22 +135,9 @@ def send_instruction_menu(chat_id):
 
 
 
-def handle_instruction_choice(message):
-    chat_id = message.chat.id
-    instruction_title = message.text
-    printer_id = sessions.get(chat_id, {}).get('printer_id')
-    if printer_id:
-        instruction_info = execute_query('SELECT id FROM Instructions WHERE title=? AND id=?', (instruction_title, printer_id))
-        if instruction_info:
-            instruction_id = instruction_info[0][0]
-            send_sections_menu(chat_id, instruction_id, instruction_title)
-        else:
-            bot.send_message(chat_id, "Инструкция не найдена. Пожалуйста, выберите инструкцию снова.")
-    else:
-        bot.send_message(chat_id, "Не удалось определить принтер. Пожалуйста, выберите принтер заново.")
 
-def send_sections_menu(chat_id, instruction_id, instruction_title):
-    sections = execute_query('SELECT id, title FROM Sections WHERE id_instruction=?', (instruction_id,))
+def send_sections_menu(chat_id):
+    sections = execute_query('SELECT id, title FROM Sections WHERE id IN (?, ?)', (6, 9))
     if sections:
         markup = types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True)
         for section in sections:
@@ -158,6 +147,21 @@ def send_sections_menu(chat_id, instruction_id, instruction_title):
         bot.register_next_step_handler_by_chat_id(chat_id, handle_section_choice)
     else:
         bot.send_message(chat_id, "Для этой инструкции нет доступных разделов.")
+
+
+
+def send_sections_menu1(chat_id):
+    sections = execute_query('SELECT id, title FROM Sections WHERE id IN (?, ?, ?)', (10, 11, 12))
+    if sections:
+        markup = types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True)
+        for section in sections:
+            button = types.KeyboardButton(section[1])
+            markup.add(button)
+        bot.send_message(chat_id, "Выберите раздел:", reply_markup=markup)
+        bot.register_next_step_handler_by_chat_id(chat_id, handle_section_choice)
+    else:
+        bot.send_message(chat_id, "Для этой инструкции нет доступных разделов.")
+
 
 def handle_section_choice(message):
     chat_id = message.chat.id
