@@ -67,8 +67,8 @@ def find_printer(message):
         bot.register_next_step_handler(message, find_printer)
 
 def send_main_menu(chat_id, user_first_name):
-    markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
-    buttons = ['Скачать инструкцию', 'Пользовательская инструкция', 'Функции', 'Описание принтера', 'Выбрать другой принтер']
+    markup = types.ReplyKeyboardMarkup(row_width=3, resize_keyboard=True)
+    buttons = ['Скачать инструкцию', 'Пользовательская инструкция','Описание принтера', 'Выбрать другой принтер', 'Инструкция для администратора']
     markup.add(*[types.KeyboardButton(btn) for btn in buttons])
     bot.send_message(chat_id, f"Привет, {user_first_name}! Чем я могу вам помочь?", reply_markup=markup)
 
@@ -80,13 +80,13 @@ def handle_main_menu(message):
         handle_printer_link(message)
     elif current_menu_item == 'Пользовательская инструкция':
         send_instruction_menu(chat_id)
-    elif current_menu_item == 'Функции':
-        pass  # Добавьте здесь логику для отображения функций принтера
     elif current_menu_item == 'Описание принтера':
         handle_printer_description(message)
     elif current_menu_item == 'Выбрать другой принтер':
         bot.send_message(chat_id, "Пожалуйста, введите название другого принтера:")
         bot.register_next_step_handler(message, find_printer)
+    elif current_menu_item == 'Инструкция для администратора':
+        send_instruction_menu(chat_id)
 
 def handle_printer_link(message):
     chat_id = message.chat.id
@@ -119,20 +119,19 @@ def handle_printer_description(message):
         bot.send_message(chat_id, "Не удалось определить принтер. Пожалуйста, выберите принтер заново.")
 
 def send_instruction_menu(chat_id):
-    printer_id = sessions.get(chat_id, {}).get('printer_id')
-    if printer_id:
-        instructions = execute_query('SELECT id, title FROM Instructions WHERE id=?', (printer_id,))
-        if instructions:
-            markup = types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True)
-            for instruction in instructions:
-                button = types.KeyboardButton(instruction[1])
-                markup.add(button)
-            bot.send_message(chat_id, "Выберите инструкцию:", reply_markup=markup)
-            bot.register_next_step_handler_by_chat_id(chat_id, handle_instruction_choice)
-        else:
-            bot.send_message(chat_id, "Для этого принтера нет инструкции.")
+    # Получаем разделы без указания конкретной инструкции
+    sections = execute_query('SELECT id, title FROM Sections')
+    if sections:
+        markup = types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True)
+        for section in sections:
+            button = types.KeyboardButton(section[1])
+            markup.add(button)
+        bot.send_message(chat_id, "Выберите раздел:", reply_markup=markup)
+        bot.register_next_step_handler_by_chat_id(chat_id, handle_section_choice)
     else:
-        bot.send_message(chat_id, "Не удалось определить принтер. Пожалуйста, выберите принтер заново.")
+        bot.send_message(chat_id, "Отсутствуют доступные разделы инструкций.")
+
+
 
 def handle_instruction_choice(message):
     chat_id = message.chat.id
@@ -227,7 +226,7 @@ def handle_subsection_choice(message, section_id, section_title):
             # Retrieve Subsections2 titles
             subsections2_titles = execute_query('SELECT title FROM Subsections2 WHERE id_subsection=?', (subsection_id,))
             if subsections2_titles:
-                markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)  # Установка row_width=2
+                markup = types.ReplyKeyboardMarkup(row_width=3, resize_keyboard=True)  # Установка row_width=2
                 buttons = [title[0] for title in subsections2_titles]
                 markup.add(*[types.KeyboardButton(btn) for btn in buttons])
                 markup.add(types.KeyboardButton("Назад"))
@@ -247,7 +246,7 @@ def handle_subsection2_choice(message, section_id, section_title):
     subsection_title = message.text
     if subsection_title == "Назад":
         send_subsections_menu(chat_id, section_id, section_title)
-        return 
+        return
 
     printer_id = sessions.get(chat_id, {}).get('printer_id')
     if printer_id:
@@ -256,7 +255,7 @@ def handle_subsection2_choice(message, section_id, section_title):
             subsection_id = subsection_info[0][0]
             # Retrieve text from Steps table
             steps = execute_query('SELECT text FROM Steps WHERE id_subsection2=?', (subsection_id,))
-            text = steps[0][0] if steps else None
+            text = '\n\n'.join(step[0] for step in steps) if steps else None
 
             # Retrieve photos from StepPhotos table
             photos = execute_query('SELECT photo FROM StepPhotos WHERE id_subsection2=?', (subsection_id,))
